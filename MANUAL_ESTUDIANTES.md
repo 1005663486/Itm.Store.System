@@ -129,3 +129,30 @@ En este paso unimos el ataque de tráfico con `k6` y activamos las reglas para q
 
    *🗣️ Guion Docente:*
    *"Miren la Terminal 1. Noten que hay un retraso de unos 15-30 segundos. Kubernetes no escala instantáneamente para evitar el 'efecto rebote'. Se llama Cooldown period. ¡Arquitectos, vean cómo nacen los nuevos pods para salvar el negocio!"*
+
+---
+
+## 🛡️ Paso 6: Fortalezas Digitales (Ciberseguridad y Gestión de Secretos - Clase 21)
+
+Vamos a proteger nuestra infraestructura implementando **Rate Limiting** en el Gateway. Esto detendrá ataques de fuerza bruta respondiendo con un `429 Too Many Requests` si alguien abusa de nuestra API.
+
+1. **Configurar Rate Limiting en el Gateway:**
+   Hemos configurado en `Itm.Gateway.Api/Program.cs` una política que solo permite **10 peticiones cada 10 segundos por IP**.
+
+2. **Probar el Escudo (Ataque con k6):**
+   Usaremos un script de k6 rápido para intentar romper el torniquete digital. Este archivo se llama `attack.js`.
+
+   Ejecuta lo siguiente:
+   ```bash
+   k6 run --vus 100 --duration 1s --insecure-skip-tls-verify attack.js
+   ```
+
+   **Resultado esperado:** Notarás que el sistema permite las primeras 10 transacciones en el log, y el resto serán bloqueos masivos y rápidos (`HTTP 429`). ¡Nuestros microservicios internos ni se enteran del ataque, ahorrando CPU y dinero en la nube!
+
+### 🔐 Gestión de Secretos (Mejores prácticas):
+Recuerden nunca guardar secretos como contraseñas en el archivo `appsettings.json`. En su lugar, el patrón correcto para entornos locales de desarrollo en .NET es usar los "User Secrets":
+
+```bash
+dotnet user-secrets set "DbPassword" "MiClaveSegura123" --project Itm.Gateway.Api/Itm.Gateway.Api.csproj
+```
+En producción, esto se sustituye cargando directamente las Variables de Entorno en el servidor o mediante servicios reales de bóveda segura como *Azure Key Vault*.
