@@ -179,3 +179,30 @@ Y seguir los pasos clave del ciclo de vida de Terraform para recrear la infraest
 3. `terraform apply` (Crea la magia en el Docker local asegurando la consistencia!)
 
 *(Al cambiar cualquier variable o borrar algo manualmente desde Docker, usa `terraform apply` y ¡el Estado del sistema lo regenerará de nuevo a lo establecido, demostrando la Idempotencia!)*
+
+---
+
+## 🔍 Paso 8: Integrando Búsquedas de Alto Rendimiento (Google-Style) con Elasticsearch y .NET 8 (Clase 22)
+
+En este paso exploramos cómo integrar el motor de búsqueda Elasticsearch directamente a nuestra arquitectura de microservicios usando **.NET 8**.
+
+1. **La "Mise en Place": Preparación del Entorno (Elasticsearch en Docker)**:
+   Levantamos el "Cerebro" de búsqueda. Para desarrollo local se levanta de esta forma apagando la seguridad nativa e iniciando un solo nodo:
+   ```bash
+   docker run -d --name itm-elastic \
+     -p 9200:9200 \
+     -e "discovery.type=single-node" \
+     -e "xpack.security.enabled=false" \
+     docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+   ```
+
+2. **Creación del Microservicio Opcional (`Itm.Search.Api`)**:
+   - Hemos configurado el cliente inyectando la configuración (`ElasticsearchClientSettings`) para apuntar a `http://localhost:9200`.
+   - Se ha creado el DTO (Record) `TicketSearchDoc` para modelar de forma plana la búsqueda (solo datos para indizar, no data completa de SQL).
+   - Se levantó e inyectó un endpoint mínimo que hace una consulta al clúster permitiéndonos realizar peticiones tolerantes a errores ortográficos usando Elastic y el paquete oficial `Elastic.Clients.Elasticsearch`.
+
+3. **Verificación de Nivel 5: Sincronización Eventual**:
+   Para los alumnos, la lección de arquitectura clave aquí es:
+   - El *Order.Api* (creado anteriormente) guarda en SQL.
+   - Dispara el evento RabbitMQ.
+   - El *Search.Api* escucharía este evento en background y agregaría el documento directamente a Elastic garantizando búsquedas veloces en ~0.001s, separándose del manejo transaccional de Base de Datos relacional tradicional.
