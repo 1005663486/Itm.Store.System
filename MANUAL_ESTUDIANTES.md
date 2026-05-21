@@ -156,3 +156,26 @@ Recuerden nunca guardar secretos como contraseñas en el archivo `appsettings.js
 dotnet user-secrets set "DbPassword" "MiClaveSegura123" --project Itm.Gateway.Api/Itm.Gateway.Api.csproj
 ```
 En producción, esto se sustituye cargando directamente las Variables de Entorno en el servidor o mediante servicios reales de bóveda segura como *Azure Key Vault*.
+
+---
+
+## 🏗️ Paso 7: Programando Nubes en clase (IaC con Terraform y Docker Local - Clase 18)
+
+Para estandarizar el despliegue de infraestructura, implementamos la filosofía de Infraestructura como Código (IaC) de Terraform combinada con un entorno Docker Local. En lugar de crear y usar manualmente el terminal para descargar e instanciar servicios de desarrollo, modelamos esto en archivos declarativos usando `HCL`.
+
+Estos archivos se encuentran en la carpeta `clase18-terraform-docker`:
+1. `provider.tf`: Le indica a Terraform que usará el proveedor de Docker (`kreuzwerker/docker`).
+2. `variables.tf`: Administra parámetros comunes como configuración del puerto (`external_port: 8080`) o el nombre del contenedor.
+3. `main.tf`: Archivo core que descarga la imagen `nginx:latest` y levanta el servicio local sin teclear comando alguno de Docker manual.
+
+### Ejecutando Terraform:
+Solo debes ingresar en la terminal a la carpeta creada:
+```bash
+cd clase18-terraform-docker
+```
+Y seguir los pasos clave del ciclo de vida de Terraform para recrear la infraestructura en tu Docker:
+1. `terraform init` (Prepara el entorno local)
+2. `terraform plan` (Lee y muestra el plan de ejecución)
+3. `terraform apply` (Crea la magia en el Docker local asegurando la consistencia!)
+
+*(Al cambiar cualquier variable o borrar algo manualmente desde Docker, usa `terraform apply` y ¡el Estado del sistema lo regenerará de nuevo a lo establecido, demostrando la Idempotencia!)*
