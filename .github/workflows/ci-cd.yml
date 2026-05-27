@@ -40,7 +40,7 @@ jobs:
           dotnet build Itm.Search.Api/Itm.Search.Api.csproj --no-restore -c Release
 
       - name: Run tests
-        run: dotnet test GestionITM.Tests --no-build -c Release --verbosity normal
+        run: dotnet test GestionITM.Tests/Itm.Inventory.Tests.csproj -c Release --verbosity normal
 
 
   # ── Job 2: Build & Push imágenes Docker ──────────────────────────────────────
