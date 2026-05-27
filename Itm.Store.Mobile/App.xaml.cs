@@ -1,15 +1,22 @@
-﻿namespace Itm.Store.Mobile
-{
-    public partial class App : Application
-    {
-        public App()
-        {
-            InitializeComponent();
-        }
+﻿using Itm.Store.Mobile.Pages;
+using Itm.Store.Mobile.Services;
 
-        protected override Window CreateWindow(IActivationState? activationState)
+namespace Itm.Store.Mobile;
+
+public partial class App : Application
+{
+    private readonly ApiService _api;
+
+    public App(ApiService api)
+    {
+        InitializeComponent();
+        _api = api;
+
+        // La app siempre arranca en el Login
+        MainPage = new NavigationPage(new LoginPage(_api))
         {
-            return new Window(new AppShell());
-        }
+            BarBackgroundColor = Color.FromArgb("#0D0D1A"),
+            BarTextColor = Colors.White
+        };
     }
 }

@@ -1,9 +1,11 @@
-using System.Net.Http.Json;
-using Microsoft.Extensions.Http.Resilience;
-using MassTransit; // Para futuras implementaciones de SAGA coreografiada con RabbitMQ o Azure Service Bus
+using Itm.Inventory.Api.Protos;
+using Itm.Order.Api.Events;
 using Itm.Order.Api.Handlers;
-using Itm.Inventory.Api.Protos; // Added for Grpc types
-
+using Itm.Order.Api.Hubs;
+using MassTransit;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Http.Resilience;
+using System.Net.Http.Json;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
@@ -12,7 +14,7 @@ builder.Services.AddSwaggerGen();
 // Agregar configuración del cliente gRPC para InventoryService
 builder.Services.AddGrpcClient<InventoryService.InventoryServiceClient>(o =>
 {
-    o.Address = new Uri("https://localhost:7198"); // Puerto HTTPS actual de Inventory.Api (ver launchSettings.json del proyecto Inventory)
+    o.Address = new Uri("https://localhost:5273"); // Puerto HTTPS actual de Inventory.Api (ver launchSettings.json del proyecto Inventory)
 });
 
 // Necesario para leer encabezados de la petición HTTP entrante
@@ -36,7 +38,7 @@ builder.Services
     .AddHttpClient("PriceClient", client =>
     {
         // TODO: Ajustar al puerto real de Price.Api cuando exista el proyecto
-        client.BaseAddress = new Uri("http://localhost:5280");
+        client.BaseAddress = new Uri("http://localhost:5022");
         client.Timeout = TimeSpan.FromSeconds(5);
     })
     .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
@@ -47,13 +49,16 @@ builder.Services.AddMassTransit(x =>
 {
     x.UsingRabbitMq((context, cfg) =>
     {
-    //Peguen aquí su AMQP URL DE CLOUDAMQP (Entre comillas dobles)
-    // En un trabajo real, esto va en el KeyVault o en las variables de entorno, no hardcodeado
-    cfg.Host("amqps://wqwoltap:bYzWB8MvzX891TQSA8YY5HB8ePSdLWda@turkey.rmq.cloudamqp.com/wqwoltap");
+        //Peguen aquí su AMQP URL DE CLOUDAMQP (Entre comillas dobles)
+        // En un trabajo real, esto va en el KeyVault o en las variables de entorno, no hardcodeado
+        cfg.Host("amqps://wqwoltap:bYzWB8MvzX891TQSA8YY5HB8ePSdLWda@turkey.rmq.cloudamqp.com/wqwoltap");
     });
 });
 
 
+
+// SIGNALR
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -63,51 +68,138 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Endpoint principal de creación de órdenes con lógica SAGA (acción + compensación)
-app.MapPost("/api/orders", async (CreateOrderDto order, IHttpClientFactory factory) =>
+// HUB
+app.MapHub<TicketHub>(
+"/ticketHub");
+
+// Endpoint principal de compra de boletas usando SAGA (reserva + compensación)
+app.MapPost("/api/orders", async (
+    CreateOrderDto order,
+    IHttpClientFactory factory,
+    IPublishEndpoint publisher,
+    IHubContext<TicketHub> hub) =>
 {
     var invClient = factory.CreateClient("InventoryClient");
+    var priceClient = factory.CreateClient("PriceClient");
 
-    // PASO 1: Intentar reservar Stock (acción directa sobre Inventario)
-    var reduceResponse = await invClient.PostAsJsonAsync("/api/inventory/reduce", order);
+    // PASO 1: Reservar boletas
+    var reduceResponse = await invClient.PostAsJsonAsync(
+        "/api/inventory/reduce",
+        new
+        {
+            ProductId = order.EventId,
+            Quantity = order.Quantity
+        });
 
     if (!reduceResponse.IsSuccessStatusCode)
     {
-        return Results.BadRequest("No se pudo reservar el stock. Transacción abortada.");
+        return Results.BadRequest(new
+        {
+            Message = "No hay boletas disponibles para este evento"
+        });
+    }
+    // PASO 2: Consultar precio
+    var priceResult =
+await priceClient.GetFromJsonAsync<PriceApiResponse>(
+$"/api/prices/{order.EventId}");
+
+    if (
+    priceResult is null ||
+    priceResult.Data is null
+    )
+    {
+        throw new Exception(
+        "No fue posible obtener precio");
     }
 
-    // Si llegamos aquí, YA RESTAMOS EL STOCK. A partir de aquí necesitamos compensación si algo falla.
+    var total =
+    priceResult.Data.TicketPrice *
+    order.Quantity;
+
+    var ticketCode = $"ITM-{Guid.NewGuid().ToString()[..8]}";
+
     try
     {
-        // PASO 2: Procesar el Pago (simulación de fallo aleatorio)
+        // PASO 2: Simulación pago
         var random = new Random();
-        var paymentSuccess = random.Next(0, 10) > 5; // Aprox. 50% de éxito
+        var paymentSuccess = true;
 
         if (!paymentSuccess)
         {
-            throw new InvalidOperationException("Fondos insuficientes en la tarjeta.");
+            throw new InvalidOperationException(
+                "Pago rechazado");
         }
 
-        return Results.Ok(new { Message = "Orden creada y pagada exitosamente." });
+        // Evento RabbitMQ
+        try
+        {
+            await publisher.Publish(
+                new TicketPurchased(
+                    Guid.NewGuid(),
+                    order.EventId,
+                    order.Quantity,
+                    order.City,
+                    ticketCode));
+
+            Console.WriteLine(
+                "[Rabbit] Evento enviado correctamente");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"[Rabbit ERROR] {ex}");
+
+            throw;
+        }
+        await hub.Clients.All.SendAsync(
+                                        "TicketReady",
+                                        ticketCode,
+                                        order.City
+                                        );
+        Console.WriteLine( $"[SIGNALR] Ticket enviado: {ticketCode}"
+);
+        // Compra exitosa
+        return Results.Ok(new
+        {
+            Ticket = ticketCode,
+            EventId = order.EventId,
+            Quantity = order.Quantity,
+            City = order.City,
+            UnitPrice = priceResult.Data.TicketPrice,
+            Total = total,
+            Currency = priceResult.Data.Currency,
+            Status = "CONFIRMED",
+            Message = "Boleta generada correctamente"
+        });
     }
     catch (Exception ex)
     {
-        // El pago falló, pero ya quitamos el stock: iniciamos la compensación tipo SAGA
-        Console.WriteLine($"[ERROR] Falló el pago: {ex.Message}. Iniciando compensación...");
+        Console.WriteLine(
+            $"[ERROR] Compra falló: {ex.Message}");
 
-        var compensateResponse = await invClient.PostAsJsonAsync("/api/inventory/release", order);
+        // Compensación SAGA
+        var compensateResponse =
+            await invClient.PostAsJsonAsync(
+            "/api/inventory/release",
+            new
+            {
+                ProductId = order.EventId,
+                Quantity = order.Quantity
+            });
 
         if (compensateResponse.IsSuccessStatusCode)
         {
-            return Results.Problem("El pago falló. El stock fue devuelto correctamente. Intente de nuevo.");
+            return Results.Problem(
+                "El pago falló. Las boletas fueron liberadas.");
         }
 
-        // Peor escenario: falló el pago y también la compensación del stock
-        Console.WriteLine("[CRITICAL] Falló la compensación. Datos inconsistentes, requiere intervención manual.");
-        return Results.Problem("Error crítico del sistema. Contacte soporte.");
+        Console.WriteLine(
+            "[CRITICAL] Error compensando inventario");
+
+        return Results.Problem(
+            "Error crítico del sistema.");
     }
 });
-
 // === NUEVO ENDPOINT gRPC ===
 // El Order.Api llama al servicio remoto como si fuera un método inyectado. Cero manejo manual de JSON.
 app.MapPost("/api/orders/grpc", async (int productId, InventoryService.InventoryServiceClient client) =>
@@ -126,117 +218,41 @@ app.MapPost("/api/orders/grpc", async (int productId, InventoryService.Inventory
 app.Run();
 
 // DTOs locales para orquestación
-public record CreateOrderDto(int ProductId, int Quantity);
+public record CreateOrderDto(
+int EventId,
+int Quantity,
+string City
+);
 
-public record InventoryResponse(int ProductId, int Stock, string Sku);
+public record InventoryResponse(
+int EventId,
+int AvailableTickets,
+string EventCode
+);
 
-public record PriceResponse(int ProductId, decimal Amount, string Currency);
+public record PriceApiResponse(
+string Source,
+PriceResponse Data
+);
+
+public record PriceResponse(
+int EventId,
+decimal TicketPrice,
+string Currency,
+string EventName
+);
 
 // Simulación de DTO de Pago (para futuras extensiones de la SAGA)
 public record PaymentDto(int OrderId, decimal Amount);
 
-// -----------------------------------------------------------------------------
-// EJEMPLO TEÓRICO (COMENTADO):
-// Patrón SAGA coreografiado usando mensajería (RabbitMQ / Azure Service Bus / Kafka)
-// -----------------------------------------------------------------------------
-//
-// Diferencia clave con la SAGA orquestada que sí implementamos arriba:
-//
-// - Orquestada (implementada):
-//   `Itm.Order.Api` hace llamadas HTTP directas a `Inventory.Api` (y en un futuro a Payment).
-//   Existe un "orquestador" que coordina el flujo y dispara las compensaciones.
-//
-// - Coreografiada (este ejemplo teórico):
-//   No hay un servicio jefe. Cada microservicio reacciona a mensajes en una cola.
-//   Order publica un evento "OrderCreated"; Inventory escucha ese evento, intenta
-//   reservar stock y luego publica otro evento "StockReserved" o "StockRejected".
-//   Payment escucha "StockReserved", intenta cobrar y publica "PaymentSucceeded"
-//   o "PaymentFailed". Order escucha esos eventos y actualiza el estado de la orden.
-//
-// A continuación un EJEMPLO SIMPLIFICADO SOLO PARA ESTUDIO (NO SE EJECUTA):
-//
-// using Azure.Messaging.ServiceBus; // o el cliente de RabbitMQ/Kafka
-// using System.Text.Json;
-//
-// app.MapPost("/api/orders/async", async (CreateOrderDto order, ServiceBusClient busClient) =>
-// {
-//     // 1. Generar identificador único de la orden
-//     var orderId = Guid.NewGuid();
-//
-//     // 2. Construir el evento de dominio "OrderCreated"
-//     var orderCreatedEvent = new
-//     {
-//         OrderId = orderId,
-//         order.ProductId,
-//         order.Quantity,
-//         CreatedAt = DateTime.UtcNow
-//     };
-//
-//     // 3. Publicar el evento en la cola/bus de mensajes
-//     var sender = busClient.CreateSender("orders");
-//     var body = JsonSerializer.Serialize(orderCreatedEvent);
-//     var message = new ServiceBusMessage(body)
-//     {
-//         Subject = "OrderCreated"
-//     };
-//
-//     await sender.SendMessageAsync(message);
-//
-//     // 4. Responder al cliente de forma asíncrona (procesamiento en background)
-//     return Results.Accepted($"/api/orders/{orderId}", new
-//     {
-//         OrderId = orderId,
-//         Status = "Pending",
-//         Message = "La orden fue recibida y será procesada de manera asíncrona."
-//     });
-// });
-//
-// -----------------------------------------------------------------------------
-// ¿Qué harían otros servicios en una SAGA coreografiada?
-// -----------------------------------------------------------------------------
-//
-// Inventory.Api (pseudo-código):
-//
-// - Suscrito a la cola "orders" filtrando Subject = "OrderCreated".
-// - Al recibir el evento:
-//   1. Verifica el stock disponible.
-//   2. Si hay stock suficiente, lo reserva y publica "StockReserved" en otra cola,
-//      por ejemplo "order-events": { OrderId, ProductId, Quantity, Status = "Reserved" }.
-//   3. Si no hay stock, publica "StockRejected": { OrderId, Reason = "OutOfStock" }.
-//
-// Payment.Api (pseudo-código):
-//
-// - Suscrito a "order-events" filtrando Subject = "StockReserved".
-// - Al recibir el evento:
-//   1. Intenta procesar el pago.
-//   2. Si el pago tiene éxito, publica "PaymentSucceeded".
-//   3. Si el pago falla, publica "PaymentFailed".
-//   4. Inventory podría escuchar "PaymentFailed" para ejecutar la compensación
-//      devolviendo el stock internamente.
-//
-// Order.Api escuchando eventos (pseudo-código):
-//
-// - Suscrito a "order-events":
-//   - Si recibe "StockRejected": marca la orden como Cancelada por falta de stock.
-//   - Si recibe "PaymentFailed": marca la orden como Fallida por pago.
-//   - Si recibe "PaymentSucceeded": marca la orden como Completada.
-//
-// -----------------------------------------------------------------------------
-// Puntos de discusión para los estudiantes:
-//
-// 1. Ventajas del enfoque coreografiado:
-//    - Menor acoplamiento: Order no conoce directamente las URLs de Inventory/Payment.
-//    - Alta escalabilidad: cada servicio escala leyendo de la cola.
-//    - Flujo basado en eventos: fácil de extender (shipping, email, notificaciones, etc.).
-//
-// 2. Retos adicionales:
-//    - Trazabilidad: el flujo pasa por varios servicios de forma asíncrona.
-//    - Observabilidad crítica: se necesitan buenos logs, métricas y tracing distribuido.
-//    - Diseño de eventos: hay que cuidar qué información viaja en cada mensaje.
-//
-// 3. Comparación con la SAGA orquestada (implementada en este archivo):
-//    - Orquestada: más fácil de entender e implementar al inicio; acopla más los servicios.
-//    - Coreografiada: más flexible y desacoplada, pero exige mejor infraestructura
-//      de mensajería y observabilidad.
-
+namespace Itm.Order.Api.Events
+{
+    public record TicketPurchased(
+        Guid OrderId,
+        int EventId,
+        int Quantity,
+        string City,
+        string TicketCode
+    );
+}
 

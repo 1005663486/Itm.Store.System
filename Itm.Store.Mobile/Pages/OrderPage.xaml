@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="Itm.Store.Mobile.Pages.OrderPage"
+    Title="Comprar Boleta"
+    BackgroundColor="#0D0D1A">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+
+            <!-- Header evento -->
+            <Border
+                BackgroundColor="#1A1A2E"
+                Stroke="#2D2D4A"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 16"
+                Padding="20">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="🎤" FontSize="36" HorizontalOptions="Center"/>
+                    <Label
+                        x:Name="ArtistLabel"
+                        FontSize="22"
+                        FontAttributes="Bold"
+                        TextColor="White"
+                        HorizontalOptions="Center"/>
+                    <Label
+                        x:Name="EventLabel"
+                        FontSize="15"
+                        TextColor="#A78BFA"
+                        HorizontalOptions="Center"/>
+                    <Label
+                        x:Name="CityLabel"
+                        FontSize="13"
+                        TextColor="#6B7280"
+                        HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Precio (desde Price.Api / Redis) -->
+            <Border
+                BackgroundColor="#1A1A2E"
+                Stroke="#2D2D4A"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 12"
+                Padding="16">
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Precio por boleta" TextColor="#6B7280" FontSize="13"/>
+                        <Label x:Name="PriceLabel" Text="Consultando..." TextColor="White" FontSize="20" FontAttributes="Bold"/>
+                        <Label x:Name="PriceSourceLabel" Text="" TextColor="#4B5563" FontSize="11"/>
+                    </VerticalStackLayout>
+                    <Label
+                        Grid.Column="1"
+                        x:Name="CurrencyLabel"
+                        TextColor="#A78BFA"
+                        FontSize="18"
+                        VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- Cantidad -->
+            <Border
+                BackgroundColor="#1A1A2E"
+                Stroke="#2D2D4A"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 12"
+                Padding="16">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
+                    <Label
+                        Grid.Column="0"
+                        Text="Cantidad"
+                        TextColor="White"
+                        FontSize="16"
+                        VerticalOptions="Center"/>
+                    <Button
+                        Grid.Column="1"
+                        Text="−"
+                        BackgroundColor="#2D1B69"
+                        TextColor="White"
+                        WidthRequest="40"
+                        HeightRequest="40"
+                        CornerRadius="8"
+                        Clicked="OnDecreaseClicked"/>
+                    <Label
+                        Grid.Column="2"
+                        x:Name="QuantityLabel"
+                        Text="1"
+                        TextColor="White"
+                        FontSize="18"
+                        FontAttributes="Bold"
+                        VerticalOptions="Center"
+                        HorizontalOptions="Center"
+                        WidthRequest="32"/>
+                    <Button
+                        Grid.Column="3"
+                        Text="+"
+                        BackgroundColor="#2D1B69"
+                        TextColor="White"
+                        WidthRequest="40"
+                        HeightRequest="40"
+                        CornerRadius="8"
+                        Clicked="OnIncreaseClicked"/>
+                </Grid>
+            </Border>
+
+            <!-- Total -->
+            <Border
+                BackgroundColor="#2D1B69"
+                Stroke="#7C3AED"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 12"
+                Padding="16">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Grid.Column="0" Text="Total" TextColor="White" FontSize="16" FontAttributes="Bold" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" x:Name="TotalLabel" Text="$0" TextColor="#A78BFA" FontSize="22" FontAttributes="Bold" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- Error -->
+            <Label
+                x:Name="ErrorLabel"
+                TextColor="#F87171"
+                FontSize="13"
+                IsVisible="False"
+                HorizontalOptions="Center"/>
+
+            <!-- Botón Comprar -->
+            <Button
+                x:Name="BuyButton"
+                Text="Comprar Ahora 🎫"
+                BackgroundColor="#7C3AED"
+                TextColor="White"
+                FontAttributes="Bold"
+                FontSize="16"
+                HeightRequest="56"
+                CornerRadius="14"
+                Clicked="OnBuyClicked"/>
+
+            <ActivityIndicator
+                x:Name="LoadingIndicator"
+                Color="#A78BFA"
+                IsRunning="False"
+                IsVisible="False"
+                HorizontalOptions="Center"/>
+
+            <!-- Panel confirmación en tiempo real (SignalR) -->
+            <Border
+                x:Name="ConfirmationPanel"
+                IsVisible="False"
+                BackgroundColor="#064E3B"
+                Stroke="#10B981"
+                StrokeThickness="2"
+                StrokeShape="RoundRectangle 16"
+                Padding="20">
+                <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                    <Label Text="✅ ¡Boleta Confirmada!" FontSize="18" FontAttributes="Bold" TextColor="#10B981" HorizontalOptions="Center"/>
+                    <Label Text="Notificación recibida vía SignalR" FontSize="12" TextColor="#6EE7B7" HorizontalOptions="Center"/>
+                    <BoxView HeightRequest="1" Color="#10B981" Margin="0,4"/>
+                    <Label x:Name="TicketCodeLabel" FontSize="24" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+                    <Label x:Name="TicketCityLabel" FontSize="14" TextColor="#6EE7B7" HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

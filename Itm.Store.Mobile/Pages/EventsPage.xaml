@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Itm.Store.Mobile.Models"
+    x:Class="Itm.Store.Mobile.Pages.EventsPage"
+    Title="Eventos"
+    BackgroundColor="#0D0D1A">
+
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="12">
+
+        <!-- Buscador -->
+        <Border
+            Grid.Row="0"
+            Stroke="#2D2D4A"
+            StrokeThickness="1"
+            BackgroundColor="#1A1A2E"
+            StrokeShape="RoundRectangle 12">
+            <Grid ColumnDefinitions="*,Auto">
+                <Entry
+                    x:Name="SearchEntry"
+                    Grid.Column="0"
+                    Placeholder="Buscar artista, ciudad, evento..."
+                    PlaceholderColor="#6B7280"
+                    TextColor="White"
+                    Margin="12,8"
+                    ReturnType="Search"/>
+                <Button
+                    Grid.Column="1"
+                    Text="🔍"
+                    BackgroundColor="Transparent"
+                    TextColor="#A78BFA"
+                    FontSize="20"
+                    Clicked="OnSearchClicked"
+                    Margin="0,0,8,0"/>
+            </Grid>
+        </Border>
+
+        <!-- Estado / Error -->
+        <Label
+            x:Name="StatusLabel"
+            Grid.Row="1"
+            Text=""
+            TextColor="#A78BFA"
+            FontSize="13"
+            HorizontalOptions="Center"
+            IsVisible="False"/>
+
+        <!-- Lista de resultados -->
+        <CollectionView
+            x:Name="ResultsList"
+            Grid.Row="2"
+            SelectionMode="Single"
+            SelectionChanged="OnEventSelected">
+
+            <CollectionView.EmptyView>
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="8">
+                    <Label Text="🎵" FontSize="48" HorizontalOptions="Center"/>
+                    <Label Text="Busca tu próximo evento" TextColor="#6B7280" HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:TicketDoc">
+                    <Border
+                        Margin="0,6"
+                        Stroke="#2D2D4A"
+                        StrokeThickness="1"
+                        BackgroundColor="#1A1A2E"
+                        StrokeShape="RoundRectangle 14">
+                        <Grid ColumnDefinitions="Auto,*" Padding="14" ColumnSpacing="14">
+
+                            <!-- Ícono evento -->
+                            <Border
+                                Grid.Column="0"
+                                BackgroundColor="#2D1B69"
+                                StrokeShape="RoundRectangle 10"
+                                WidthRequest="52"
+                                HeightRequest="52">
+                                <Label
+                                    Text="🎤"
+                                    FontSize="24"
+                                    VerticalOptions="Center"
+                                    HorizontalOptions="Center"/>
+                            </Border>
+
+                            <!-- Info -->
+                            <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                                <Label
+                                    Text="{Binding ArtistName}"
+                                    FontAttributes="Bold"
+                                    FontSize="16"
+                                    TextColor="White"/>
+                                <Label
+                                    Text="{Binding EventName}"
+                                    FontSize="13"
+                                    TextColor="#A78BFA"/>
+                                <Label
+                                    Text="{Binding City, StringFormat='📍 {0}'}"
+                                    FontSize="12"
+                                    TextColor="#6B7280"/>
+                                <Label
+                                    Text="{Binding Venue}"
+                                    FontSize="12"
+                                    TextColor="#4B5563"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="Itm.Store.Mobile.Pages.LoginPage"
+    Title="ITM-Tickets"
+    BackgroundColor="#0D0D1A">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="32"
+            Spacing="20"
+            VerticalOptions="Center">
+
+            <!-- Logo / Título -->
+            <Label
+                Text="🎫 ITM-Tickets"
+                FontSize="34"
+                FontAttributes="Bold"
+                TextColor="White"
+                HorizontalOptions="Center" />
+
+            <Label
+                Text="The World Tour 2026"
+                FontSize="16"
+                TextColor="#A78BFA"
+                HorizontalOptions="Center"
+                Margin="0,0,0,16"/>
+
+            <!-- Email -->
+            <Border
+                Stroke="#2D2D4A"
+                StrokeThickness="1"
+                BackgroundColor="#1A1A2E"
+                StrokeShape="RoundRectangle 12">
+                <Entry
+                    x:Name="EmailEntry"
+                    Placeholder="Correo electrónico"
+                    PlaceholderColor="#6B7280"
+                    TextColor="White"
+                    Keyboard="Email"
+                    Margin="12,8" />
+            </Border>
+
+            <!-- Password -->
+            <Border
+                Stroke="#2D2D4A"
+                StrokeThickness="1"
+                BackgroundColor="#1A1A2E"
+                StrokeShape="RoundRectangle 12">
+                <Entry
+                    x:Name="PasswordEntry"
+                    Placeholder="Contraseña"
+                    PlaceholderColor="#6B7280"
+                    TextColor="White"
+                    IsPassword="True"
+                    Margin="12,8" />
+            </Border>
+
+            <!-- Error label -->
+            <Label
+                x:Name="ErrorLabel"
+                TextColor="#F87171"
+                FontSize="13"
+                IsVisible="False"
+                HorizontalOptions="Center"/>
+
+            <!-- Botón Login -->
+            <Button
+                x:Name="LoginButton"
+                Text="Iniciar Sesión"
+                BackgroundColor="#7C3AED"
+                TextColor="White"
+                FontAttributes="Bold"
+                FontSize="16"
+                HeightRequest="52"
+                CornerRadius="12"
+                Clicked="OnLoginClicked" />
+
+            <!-- Loading -->
+            <ActivityIndicator
+                x:Name="LoadingIndicator"
+                Color="#A78BFA"
+                IsRunning="False"
+                IsVisible="False"
+                HorizontalOptions="Center"/>
+
+            <!-- Demo hint -->
+            <Label
+                Text="Demo: admin@itm.edu / 1234"
+                TextColor="#4B5563"
+                FontSize="12"
+                HorizontalOptions="Center"
+                Margin="0,16,0,0"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

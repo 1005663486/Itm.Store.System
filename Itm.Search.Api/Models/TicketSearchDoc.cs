@@ -1,8 +1,14 @@
 namespace Itm.Search.Api.Models;
 
-public record TicketSearchDoc(
-    string Id, // En Elastic los Ids suelen ser strings
-    string ArtistName,
-    string Venue,
-    DateTime EventDate,
-    decimal Price);
+public class TicketSearchDoc
+{
+    public int Id { get; set; }
+
+    public string ArtistName { get; set; } = string.Empty;
+
+    public string Venue { get; set; } = string.Empty;
+
+    public string City { get; set; } = string.Empty;
+
+    public string EventName { get; set; } = string.Empty;
+}

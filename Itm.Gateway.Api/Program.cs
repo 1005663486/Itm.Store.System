@@ -1,36 +1,102 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using System.Threading.RateLimiting;
 
-var builder = WebApplication.CreateBuilder(args); // La creación del builder
+var builder = WebApplication.CreateBuilder(args);
 
-// 🛡️ ESCUDO DE SEGURIDAD: RATE LIMITING (NIVEL 5)
+
+// ======================================
+// JWT SECURITY
+// ======================================
+
+var secretKey =
+Encoding.UTF8.GetBytes(
+"ITM-Super-Secret-Key-For-JWT-Class-2026-Nivel5");
+
+builder.Services
+.AddAuthentication(
+JwtBearerDefaults.AuthenticationScheme)
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters =
+    new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = "ItmIdentityServer",
+
+        ValidateAudience = true,
+        ValidAudience = "ItmStoreApis",
+
+        ValidateLifetime = false,
+
+        ValidateIssuerSigningKey = true,
+
+        IssuerSigningKey =
+        new SymmetricSecurityKey(secretKey)
+    };
+});
+
+builder.Services.AddAuthorization();
+
+
+// ======================================
+// RATE LIMITING
+// ======================================
+
 builder.Services.AddRateLimiter(options =>
 {
-    // Si alguien abusa, respondemos con un 429 (Too Many Requests)
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.RejectionStatusCode =
+    StatusCodes.Status429TooManyRequests;
 
-    // Política de "Ventana Fija": 10 peticiones cada 10 segundos por cada IP
     options.AddPolicy("fixed", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString(),
-            factory: _ => new FixedWindowRateLimiterOptions
+            partitionKey:
+            httpContext.Connection
+            .RemoteIpAddress?
+            .ToString(),
+
+            factory: _ =>
+            new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 10,
                 Window = TimeSpan.FromSeconds(10),
-                QueueLimit = 0 // No hacemos fila; se rechaza de inmediato
+                QueueLimit = 0
             }));
 });
 
-//1. Agregamos YARP a la caja de herramientas (DI)
-// Le decimos que lea la configuración del archivo appsettings.json
-builder.Services.AddReverseProxy()
-    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+
+// ======================================
+// YARP
+// ======================================
+
+builder.Services
+.AddReverseProxy()
+.LoadFromConfig(
+builder.Configuration
+.GetSection("ReverseProxy"));
 
 var app = builder.Build();
 
-app.UseRateLimiter(); // 1. Activamos el motor
 
-//2. Activamos el middleware de YARP y le aplicamos la política de Rate Limiting
-app.MapReverseProxy().RequireRateLimiting("fixed");
+// ======================================
+// MIDDLEWARE
+// ======================================
+
+app.UseAuthentication();
+
+app.UseAuthorization();
+
+app.UseRateLimiter();
+
+
+// ======================================
+// YARP
+// ======================================
+
+app.MapReverseProxy()
+.RequireAuthorization()
+.RequireRateLimiting("fixed");
 
 app.Run();

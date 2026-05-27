@@ -1,76 +1,128 @@
-using Microsoft.AspNetCore.Mvc;
 using Itm.Product.Api.Handlers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
-// Necesario para leer encabezados de la petición HTTP entrante (Authorization)
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition(
+        "Bearer",
+        new OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Ingrese: Bearer {token}"
+        });
+
+    options.AddSecurityRequirement(
+        new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference =
+                    new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+
+                Array.Empty<string>()
+            }
+        });
+});
+
+// Necesario para leer el Authorization que llega
 builder.Services.AddHttpContextAccessor();
 
-// DelegatingHandler que reenviará el encabezado Authorization a Inventory/Price
+// Handler que reenvía el JWT hacia Inventory
 builder.Services.AddTransient<AuthForwardingDelegatingHandler>();
 
-// -----------------------------------------------------------
-// ANÁLISIS PROFUNDO: REGISTRO DE CLIENTES HTTP
-// -----------------------------------------------------------
-// ¿Qué problema resuelve? Evita crear conexiones manuales y gestiona la red.
+// =====================================
+// CLIENTE INVENTORY
+// =====================================
+
 builder.Services.AddHttpClient("InventoryClient", client =>
 {
-    // OJO: Este puerto debe ser el del Inventory.Api (Revisar launchSettings.json)
-    // En producción, esto viene de una variable de entorno, no quemado en código.
+    // Puerto REAL donde corre Inventory
     client.BaseAddress = new Uri("http://localhost:5273");
 
-    // Timeout: Si el inventario no responde en 5s, cancelamos. 
-    // Evita que el usuario espere infinitamente.
     client.Timeout = TimeSpan.FromSeconds(5);
+
 })
-// RESILIENCIA (Rúbrica Nivel 5):
-// .AddStandardResilienceHandler(): Agrega magia automática.
-// - Reintentos (Retry): Si falla, intenta 3 veces más.
-// - Circuit Breaker: Si falla mucho, deja de intentar para no saturar.
-    .AddHttpMessageHandler<AuthForwardingDelegatingHandler>()
-    .AddStandardResilienceHandler();
+.AddHttpMessageHandler<AuthForwardingDelegatingHandler>()
+.AddStandardResilienceHandler();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
-
-// Endpoint Orquestador
-app.MapGet("/api/products/{id}/check-stock", async (int id, IHttpClientFactory factory) =>
+if (app.Environment.IsDevelopment())
 {
-    // 1. Pedimos prestado un cliente configurado a la fábrica
-    var client = factory.CreateClient("InventoryClient");
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+// =====================================
+// ENDPOINT ORQUESTADOR
+// =====================================
+
+app.MapGet(
+"/api/products/{id}/check-stock",
+async (
+int id,
+IHttpClientFactory factory
+) =>
+{
+    var client =
+    factory.CreateClient("InventoryClient");
 
     try
     {
-        // 2. Hacemos la llamada asíncrona (async/await)
-        // Usamos GetFromJsonAsync para traer el dato y convertirlo a objeto C# en un solo paso.
-        // 'InventoryDto' es una clase interna (ver abajo) para recibir los datos.
-        var stockData = await client.GetFromJsonAsync<InventoryResponse>($"/api/inventory/{id}");
+        var stockData =
+        await client.GetFromJsonAsync
+        <InventoryResponse>(
+        $"/api/inventory/{id}"
+        );
 
-        // 3. Construimos la respuesta final agregando valor
         return Results.Ok(new
         {
             ProductId = id,
-            MarketingName = "Super Laptop Gamer", // Dato propio de Productos
-            StockInfo = stockData,                // Dato traído de Inventario
-            Source = "Live from Microservice"
+
+            MarketingName =
+            "Super Laptop Gamer",
+
+            StockInfo = stockData,
+
+            Source =
+            "Live from Microservice"
         });
     }
+
     catch (HttpRequestException ex)
     {
-        // MANEJO DE ERRORES (Rúbrica Nivel 5):
-        // No mostramos el error técnico feo al usuario.
-        // Capturamos si el otro servicio está caído.
-        return Results.Problem($"El servicio de Inventario no responde. Detalle: {ex.Message}");
+        return Results.Problem(
+        $"El servicio de Inventario no responde. Detalle: {ex.Message}"
+        );
     }
 });
 
 app.Run();
 
-// DTO Local para recibir la respuesta (Debe coincidir con el del otro servicio)
-record InventoryResponse(int ProductId, int Stock, string Sku);
-record ProductResponse(int ProductId, decimal Amount, string Currency);
+record InventoryResponse(
+int ProductId,
+int Stock,
+string Sku
+);
+
+record ProductResponse(
+int ProductId,
+decimal Amount,
+string Currency
+);
