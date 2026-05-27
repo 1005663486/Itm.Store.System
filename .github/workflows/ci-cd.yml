@@ -24,13 +24,24 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: |
+          dotnet restore Itm.Gateway.Api/Itm.Gateway.Api.csproj
+          dotnet restore Itm.Inventory.Api/Itm.Inventory.Api.csproj
+          dotnet restore Itm.Order.Api/Itm.Order.Api.csproj
+          dotnet restore Itm.Price.Api/Itm.Price.Api.csproj
+          dotnet restore Itm.Search.Api/Itm.Search.Api.csproj
 
       - name: Build solution
-        run: dotnet build --no-restore -c Release
+        run: |
+          dotnet build Itm.Gateway.Api/Itm.Gateway.Api.csproj --no-restore -c Release
+          dotnet build Itm.Inventory.Api/Itm.Inventory.Api.csproj --no-restore -c Release
+          dotnet build Itm.Order.Api/Itm.Order.Api.csproj --no-restore -c Release
+          dotnet build Itm.Price.Api/Itm.Price.Api.csproj --no-restore -c Release
+          dotnet build Itm.Search.Api/Itm.Search.Api.csproj --no-restore -c Release
 
       - name: Run tests
-        run: dotnet test --no-build -c Release --verbosity normal
+        run: dotnet test GestionITM.Tests --no-build -c Release --verbosity normal
+
 
   # ── Job 2: Build & Push imágenes Docker ──────────────────────────────────────
   build-and-push:
