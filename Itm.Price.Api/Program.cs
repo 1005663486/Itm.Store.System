@@ -7,10 +7,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Redis
+var redisUrl = builder.Configuration["Redis:ConnectionString"]
+               ?? "localhost:6379";
+
 builder.Services.AddSingleton<IConnectionMultiplexer>(
 sp =>
-ConnectionMultiplexer.Connect(
-"localhost:6379")
+ConnectionMultiplexer.Connect(redisUrl)
 );
 
 var app = builder.Build();

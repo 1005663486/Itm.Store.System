@@ -11,19 +11,62 @@ resource "docker_image" "inventory" {
   keep_locally = false
 }
 
-resource "docker_image" "order" {
-  name         = "${var.dockerhub_username}/itm-tickets-order:${var.image_tag}"
-  keep_locally = false
+resource "docker_container" "order" {
+  name  = "itm-order"
+  image = docker_image.order.image_id
+
+  ports {
+    internal = 8080
+    external = 5110
+  }
+
+  env = [
+    "ASPNETCORE_ENVIRONMENT=Production",
+    "InventoryClient__BaseAddress=http://itm-inventory:8080",
+    "PriceClient__BaseAddress=http://itm-price:8080"
+  ]
+
+  networks_advanced {
+    name = docker_network.itm_network.name
+  }
 }
 
-resource "docker_image" "price" {
-  name         = "${var.dockerhub_username}/itm-tickets-price:${var.image_tag}"
-  keep_locally = false
+resource "docker_container" "price" {
+  name  = "itm-price"
+  image = docker_image.price.image_id
+
+  ports {
+    internal = 8080
+    external = 5022
+  }
+
+  env = [
+    "ASPNETCORE_ENVIRONMENT=Production",
+    "ConnectionStrings__Redis=itm-redis:6379"
+  ]
+
+  networks_advanced {
+    name = docker_network.itm_network.name
+  }
 }
 
-resource "docker_image" "search" {
-  name         = "${var.dockerhub_username}/itm-tickets-search:${var.image_tag}"
-  keep_locally = false
+resource "docker_container" "search" {
+  name  = "itm-search"
+  image = docker_image.search.image_id
+
+  ports {
+    internal = 8080
+    external = 5062
+  }
+
+  env = [
+    "ASPNETCORE_ENVIRONMENT=Production",
+    "Elasticsearch__Uri=http://itm-elasticsearch:9200"
+  ]
+
+  networks_advanced {
+    name = docker_network.itm_network.name
+  }
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
