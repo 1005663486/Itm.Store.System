@@ -129,6 +129,48 @@ resource "docker_container" "search" {
     name = docker_network.itm_network.name
   }
 }
+resource "docker_image" "elasticsearch" {
+  name         = "docker.elastic.co/elasticsearch/elasticsearch:8.13.4"
+  keep_locally = true
+}
+
+resource "docker_container" "elasticsearch" {
+  name  = "itm-elasticsearch"
+  image = docker_image.elasticsearch.image_id
+
+  env = [
+    "discovery.type=single-node",
+    "xpack.security.enabled=false",
+    "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+  ]
+
+  ports {
+    internal = 9200
+    external = 9200
+  }
+
+  networks_advanced {
+    name = docker_network.itm_network.name
+  }
+}
+resource "docker_image" "redis" {
+  name         = "redis:latest"
+  keep_locally = true
+}
+
+resource "docker_container" "redis" {
+  name  = "itm-redis"
+  image = docker_image.redis.image_id
+
+  ports {
+    internal = 6379
+    external = 6379
+  }
+
+  networks_advanced {
+    name = docker_network.itm_network.name
+  }
+}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OUTPUTS
